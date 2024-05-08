@@ -1172,3 +1172,8 @@ ERROR_HANDLER:
     MsgBox "—ñ•’²®ƒGƒ‰[:" & ERR.Number & " : " & ERR.Description
 End Sub
 
+Private Sub WebBrowserPreview_BeforeNavigate2(ByVal pDisp As Object, URL As Variant, Flags As Variant, TargetFrameName As Variant, PostData As Variant, Headers As Variant, Cancel As Boolean)
+    Debug.Print URL
+'    Cancel = True
+End Sub
+
