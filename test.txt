@@ -1,0 +1,63 @@
+Private Sub MakeTransparentLV(ListView As Object)
+    Dim hWndLV As LongPtr
+    
+    Call WindowFromAccessibleObject(ListView, hWndLV)
+    
+    Call SetWindowLongPtr(hWndLV, GWL_EXSTYLE, GetWindowLongPtr(hWndLV, GWL_EXSTYLE) Or WS_EX_LAYERED)
+    
+    Call SetLayeredWindowAttributes(hWndLV, ListView.BackColor, 0, LWA_COLORKEY)
+    Call ListView.ZOrder(1)
+
+End Sub
+
+Set adoStream = CreateObject("ADODB.Stream")
+Set fso = CreateObject("Scripting.FileSystemObject")
+Set regEx = CreateObject("VBscript.RegExp")
+regEx.Global = True
+regEx.Pattern = "/Type\s*/Page[^s]"
+
+reStr = "ファイル名" & vbTab & "ページ数"
+
+For Each arg In WScript.Arguments
+    If fso.GetExtensionName(arg) = "pdf" Then
+        With adoStream
+            .Charset = "UTF-8"
+            .Type = 2    '//［1：バイナリモード］ ［2：テキストモード］
+            .Open
+            .LoadFromFile arg
+            pageCnt = regEx.Execute(.ReadText).Count
+            .Close
+        End With
+        reStr = reStr & vbCrLf & fso.GetFileName (arg) & vbTab & pageCnt
+    End If
+Next
+
+Function getPDFPageCount(ByVal path As String) As Long
+On Error GoTo Error1
+
+Dim PDFSourceText As String
+With CreateObject("ADODB.Stream")
+    .Charset = "UTF-8"
+    .Open
+    .LoadFromFile path
+    PDFSourceText = .ReadText
+    .Close
+End With
+
+Dim RegExpMatchCollection As Object
+Dim RegExpMatch As Object
+With CreateObject("VBScript.RegExp")
+    .Pattern = "(/Count )\d*"
+    .MultiLine = True
+    Set RegExpMatchCollection = .Execute(PDFSourceText)
+    Set RegExpMatch = RegExpMatchCollection.Item(0)
+    getPDFPageCount = CLng(Val(Mid(RegExpMatch.value, 8)))
+End With
+
+Exit Function
+
+Error1:
+
+getPDFPageCount = CLng(-1)
+
+End Function
