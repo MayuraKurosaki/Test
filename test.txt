@@ -16,19 +16,16 @@ Set regEx = CreateObject("VBscript.RegExp")
 regEx.Global = True
 regEx.Pattern = "/Type\s*/Page[^s]"
 
-reStr = "ファイル名" & vbTab & "ページ数"
-
 For Each arg In WScript.Arguments
     If fso.GetExtensionName(arg) = "pdf" Then
         With adoStream
             .Charset = "UTF-8"
-            .Type = 2    '//［1：バイナリモード］ ［2：テキストモード］
+            .Type = 2
             .Open
             .LoadFromFile arg
             pageCnt = regEx.Execute(.ReadText).Count
             .Close
         End With
-        reStr = reStr & vbCrLf & fso.GetFileName (arg) & vbTab & pageCnt
     End If
 Next
 
