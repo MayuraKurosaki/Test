@@ -1,0 +1,504 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "ListView"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+Private Const ICC_LISTVIEW_CLASSES = &H1          ' listview, header
+Private Const IDD_LISTVIEW = 101
+Private Const WC_LISTVIEW = "SysListView32"
+
+Private Type Fields
+    Frame As IControl
+    hFont As LongPtr
+    ColumnCount As Long
+    ListItemsCount As Long
+End Type
+Private Type TT
+    hParent As LongPtr
+    hChild As LongPtr
+    pfn As LongPtr
+End Type
+''
+Private TT As TT
+Private acc As IAccessible
+
+Private This As Fields
+
+'Private fr As IControl
+'Private fnt As LongPtr
+
+Event ItemSelected(ByVal iItem As Long, ByVal iSubItem As Long)
+Event ItemClick(ByVal iItem As Long, ByVal iSubItem As Long)
+'Event ItemDClick(ByVal iItem As Long, ByVal iSubItem As Long)
+
+Private Sub Class_Initialize()
+    With This
+        .ColumnCount = 0
+        .ListItemsCount = 0
+    End With
+End Sub
+
+Private Sub Class_Terminate()
+    DeleteObject This.hFont
+    RemoveSubClass
+End Sub
+
+Public Function Init(ByVal Ctl As IOptionFrame) As Boolean
+    Init = False
+    Dim mWS As Long
+    
+    Dim iccex As InitCommonControlsExType
+    Dim wd As Long, ht As Long
+    
+    Dim flbkColor As Long
+    Dim buf As Long
+    
+    If TT.hParent Then Exit Function
+    Set This.Frame = Ctl
+       
+    TT.hParent = This.Frame.[_GethWnd]
+    
+'    Call WindowFromAccessibleObject(fr, TT.hParent)
+    
+    If TT.hParent = 0 Then
+        Err.Raise 91
+    End If
+    
+    Set acc = This.Frame
+    acc.accLocation 0, 0, wd, ht
+    
+    iccex.lngSize = Len(iccex)
+'    Debug.Print iccex.lngSize
+    iccex.lngICC = ICC_LISTVIEW_CLASSES
+    InitCommonControlsEx iccex
+    
+    With TT
+'        .pfn = GetPtr(AddressOf ListViewModule.Redirect)
+        .pfn = GetPtr(AddressOf Redirect)
+'        Debug.Print "hParent:" & .hParent & " / pfn:" & .pfn
+        If SetWindowSubclass(.hParent, .pfn, .hParent, ObjPtr(Me)) = 0 Then Debug.Print "FrameSubclassError": Exit Function
+               
+'        Debug.Print "Frame:" & IIf(IsWindowUnicode(.hParent), "Unicode", "ANCI")
+        
+        'コモンコントロールのウィンドウスタイル
+        mWS = WS_CHILD Or WS_VISIBLE Or WS_CLIPSIBLINGS
+        mWS = mWS Or LVS_REPORT Or LVS_SHOWSELALWAYS
+        
+        On Error GoTo ErrorHandler
+        
+        .hChild = CreateWindowEx(WS_EX_CLIENTEDGE, _
+                            WC_LISTVIEW, 0, mWS, _
+                            0, 0, wd, ht, .hParent, IDD_LISTVIEW, 0, 0)
+        If .hChild = 0 Then Exit Function
+'        Debug.Print "Frame:" & IIf(IsWindowUnicode(.hChild), "Unicode", "ANCI")
+'        Debug.Print "ｈChild" & .hChild
+        If SetWindowSubclass(.hChild, .pfn, .hChild, ObjPtr(Me)) = 0 Then Debug.Print "ListViewSubclassError": Exit Function
+                                    
+        '拡張スタイル
+        mWS = LVS_EX_FULLROWSELECT Or LVS_EX_GRIDLINES Or LVS_EX_CHECKBOXES
+        SendMessage .hChild, LVM_SETEXTENDEDLISTVIEWSTYLE, 0, ByVal mWS
+
+'       '------<color>----------
+'       flbkColor = GetSysColor(vbButtonFace And &HFF)
+'       SendMessageW .hChild, LVM_SETTEXTBKCOLOR, 0, flbkColor
+'       SendMessageW .hChild, LVM_SETBKCOLOR, 0, flbkColor
+''       SendMessageW .hChild, LVM_SETTEXTCOLOR, 0, RGB(255, 0, 0)
+  
+       '------<font>----------
+'       This.hFont = CreateFontW(16, _
+                         FW_NORMAL, _
+                         0, _
+                         0, _
+                         0, _
+                         False, _
+                         False, _
+                         False, _
+                         DEFAULT_CHARSET, _
+                         OUT_DEFAULT_PRECIS, _
+                         CLIP_DEFAULT_PRECIS, _
+                         DEFAULT_QUALITY, _
+                         DEFAULT_PITCH, _
+                         StrPtr("Yu Gothic UI"))
+'                         StrPtr("MS UI Gothic"))
+'
+'                        int nHeight,               '// フォントの高さ
+'                        int nWidth,                '// 平均文字幅
+'                        int nEscapement,           '// 文字送り方向の角度
+'                        int nOrientation,          '// ベースラインの角度
+'                        int fnWeight,              '// フォントの太さ
+'                        DWORD fdwItalic,           '// 斜体にするかどうか
+'                        DWORD fdwUnderline,        '// 下線を付けるかどうか
+'                        DWORD fdwStrikeOut,        '// 取り消し線を付けるかどうか
+'                        DWORD fdwCharSet,          '// 文字セットの識別子
+'                        DWORD fdwOutputPrecision,  '// 出力精度
+'                        DWORD fdwClipPrecision,    '// クリッピング精度
+'                        DWORD fdwQuality,          '// 出力品質
+'                        DWORD fdwPitchAndFamily,   '// ピッチとファミリ
+'                        LPCTSTR lpszFace           '// フォント名
+       This.hFont = CreateFont(16, _
+                         FW_NORMAL, _
+                         0, _
+                         0, _
+                         0, _
+                         False, _
+                         False, _
+                         False, _
+                         DEFAULT_CHARSET, _
+                         OUT_DEFAULT_PRECIS, _
+                         CLIP_DEFAULT_PRECIS, _
+                         DEFAULT_QUALITY, _
+                         DEFAULT_PITCH, _
+                         "Yu Gothic UI")
+        
+'        SendMessageW .hChild, WM_SETFONT, fnt, ByVal 1&
+        
+'        SendMessage .hChild, WM_SETFONT, This.hFont, ByVal 1&
+'        SendMessage hChild, WM_SETFONT, This.hFont, ByVal 1&
+
+'        SendMessageW .hChild, LVM_SETTEXTCOLOR, 0, RGB(0, 0, 0)    '[黒]
+''    SendMessageW TT.hChild, LVM_SETTEXTCOLOR, 0, RGB(0, 0, 255)  '[青]
+       
+    End With
+    Init = True
+    Exit Function
+    
+ErrorHandler:
+    Debug.Print GetAPIError(Err.LastDllError)
+    Call RemoveSubClass
+End Function
+
+Public Function SetWindowFont() As Long
+    
+End Function
+
+Public Function SetReportHeader(Items() As String) As Long
+    Dim i As Long
+    This.ColumnCount = UBound(Items)
+    For i = 0 To This.ColumnCount
+        Call InsertColumn(Items(i), i, 0)
+    Next i
+End Function
+
+Public Function SetReportRecord(Items() As String) As Long
+    Dim i As Long
+    Call InsertItem(Items(0), This.ListItemsCount)
+    If This.ColumnCount < UBound(Items) Then
+        For i = This.ColumnCount + 1 To UBound(Items)
+            Call InsertColumn("", i, 0)
+        Next i
+        This.ColumnCount = UBound(Items)
+    End If
+    For i = 1 To This.ColumnCount
+        Call SetItem(Items(i), This.ListItemsCount, i)
+    Next i
+    This.ListItemsCount = This.ListItemsCount + 1
+End Function
+
+Public Function InsertColumn(Title As String, ByVal iCol As Long, ByVal Width As Long) As Long
+    Dim lvc As LVCOLUMNA
+    With lvc
+        .mask = LVCF_TEXT Or LVCF_WIDTH Or LVCF_SUBITEM
+        .CX = Width
+        .pszText = Title
+    End With
+    With TT
+        If .hChild = 0 Then Exit Function
+        InsertColumn = CLng(SendMessage(.hChild, LVM_INSERTCOLUMN, ByVal iCol, lvc))
+    End With
+End Function
+
+Public Function InsertItem(sItem As String, ByVal iItem As Long) As Long
+    Dim lvi As LVITEMA
+    With lvi
+        .mask = LVIF_TEXT
+        .iItem = iItem
+        .pszText = sItem
+    End With
+    With TT
+        If .hChild = 0 Then Exit Function
+        InsertItem = CLng(SendMessage(.hChild, LVM_INSERTITEM, 0, lvi))
+    End With
+End Function
+
+Public Function SetItem(sItem As String, ByVal iItem As Long, ByVal iSubItem As Long) As Long
+    Dim lvi As LVITEMA
+    With lvi
+        .mask = LVIF_TEXT
+        .iItem = iItem
+        .iSubItem = iSubItem
+        .pszText = sItem
+    End With
+    With TT
+        If .hChild = 0 Then Exit Function
+        SetItem = CLng(SendMessage(.hChild, LVM_SETITEM, 0, lvi))
+    End With
+End Function
+
+Public Function DeleteAllItems() As Long
+    DeleteAllItems = CLng(SendMessage(TT.hChild, LVM_DELETEALLITEMS, 0, 0))
+End Function
+
+Public Function GetItemCount() As Long
+    GetItemCount = CLng(SendMessage(TT.hChild, LVM_GETITEMCOUNT, 0, 0))
+End Function
+
+Public Function LabelText(ByVal iItem As Long, ByVal iSubItem As Long) As String
+'    Debug.Print "Item:" & iItem & " / SubItem:" & iSubItem
+    Dim lv As LVITEMA
+    Dim buf As String * 255
+'    buf = String(255, vbNullChar)
+'    Debug.Print "Len(buf):" & Len(buf)
+    
+    With lv
+        .cchTextMax = 256
+        .iSubItem = iSubItem
+        .pszText = buf
+    End With
+    SendMessage TT.hChild, LVM_GETITEMTEXT, iItem, lv
+    
+    LabelText = lv.pszText
+'    Debug.Print "Len(LabelText):" & Len(LabelText)
+'    Debug.Print "LabelText:" & LabelText
+End Function
+
+Public Function GetCheckState(ByVal ii As Long) As Boolean
+' チェック状態を取得（ii = インデックス）...
+    ' LVM_GETITEMSTATE...
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_GETITEMSTATE, ii, &H1000&))
+    If ret <> 0 Then
+        GetCheckState = True
+    Else
+        GetCheckState = False
+    End If
+'    ii = CLng(SendMessage(TT.hChild, LVM_GETITEMSTATE, ii, &H1000&))
+'    GetCheckState = ii  '= 0
+End Function
+
+Public Sub SetCheckState(ByVal ii As Long, ByVal F As Boolean)
+' チェック状態をセット（ii = インデックス)
+' iiが「-1」の時は全ての項目が対象
+    Dim buf As LVITEMA
+    With buf
+        .stateMask = &HF000&    'LVIS_STATEIMAGEMASK
+        .State = &H1000&
+        If F Then .State = &H2000&
+    End With
+    ' LVM_SETITEMSTATE
+    SendMessage TT.hChild, LVM_SETITEMSTATE, ii, VarPtr(buf)
+End Sub
+
+Public Function SetTextColor(ClrText As Long) As Boolean
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_SETTEXTCOLOR, 0, ByVal ClrText))
+    If ret <> 0 Then
+        SetTextColor = True
+    Else
+        SetTextColor = False
+    End If
+End Function
+
+Public Function SetTextBkColor(ClrTextBk As Long) As Boolean
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_SETTEXTBKCOLOR, 0, ClrTextBk))
+    If ret <> 0 Then
+        SetTextBkColor = True
+    Else
+        SetTextBkColor = False
+    End If
+End Function
+
+Public Function RedrawItems(iFirst As Long, iLast As Long) As Boolean
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_REDRAWITEMS, ByVal iFirst, ByVal iLast))
+    If ret <> 0 Then
+        RedrawItems = True
+    Else
+        RedrawItems = False
+    End If
+End Function
+
+Public Function Update(i As Long) As Boolean
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_UPDATE, ByVal i, 0))
+    If ret <> 0 Then
+        Update = True
+    Else
+        Update = False
+    End If
+End Function
+
+Public Function SetColumnWidth(iCol As Long, CX As Long) As Boolean
+    Dim ret As Long
+    ret = CLng(SendMessage(TT.hChild, LVM_SETCOLUMNWIDTH, ByVal iCol, ByVal MAKELPARAM(CX, 0)))
+    If ret <> 0 Then
+        SetColumnWidth = True
+    Else
+        SetColumnWidth = False
+    End If
+End Function
+
+Public Function SetAllColumnWidthAuto() As Boolean
+    SetAllColumnWidthAuto = False
+    Dim i As Long
+    For i = 0 To This.ColumnCount
+        SetAllColumnWidthAuto = SetColumnWidth(i, LVSCW_AUTOSIZE_USEHEADER)
+        If SetAllColumnWidthAuto = False Then Exit Function
+    Next i
+End Function
+
+Friend Function WndProc(ByVal hWnd As LongPtr, ByVal uMsg As Long, ByVal wParam As LongPtr, ByVal lParam As LongPtr) As LongPtr
+    Dim iCode As Long
+    Dim nlv As NMLISTVIEW
+    Dim nia As NMITEMACTIVATE  ' ←追加
+
+    
+    If hWnd = TT.hParent Then
+    
+        Select Case uMsg
+        
+            Case WM_SETFOCUS
+                SetFocus TT.hChild
+                Exit Function
+    
+            Case WM_NOTIFY
+                Dim rtn As Long
+                If (wParam = IDD_LISTVIEW) Then
+                    rtn = DoGVNotify(hWnd, lParam)
+                End If
+                If rtn Then
+                  WndProc = rtn
+                  Exit Function
+                End If
+                
+'                MoveMemory iCode, ByVal lParam + 8, 4
+''                Debug.Print "WM_NOTIFY:iCode:" & iCode
+'
+'                Select Case iCode
+'
+'                    Case LVN_ITEMCHANGED
+'                        Debug.Print "LVN_ITEMCHANGED"
+'                        MoveMemory nlv, ByVal lParam, LenB(nlv)
+'                        RaiseEvent ItemSelected(nlv.iItem, nlv.iSubItem)
+'                        Exit Function
+'
+'                    Case NM_CLICK
+'                        Debug.Print "NM_CLICK"
+'                        MoveMemory nia, ByVal lParam, LenB(nia)
+'                        RaiseEvent ItemClick(nia.iItem, nia.iSubItem)
+'                        Exit Function
+'
+''                    Case NM_DBLCLK
+''                        MoveMemory nia, ByVal lParam, LenB(nia)
+''                        RaiseEvent ItemClick(nia.iItem, nia.iSubItem)
+''                        Exit Function
+'
+'
+''                    Case いろいろ...
+'':
+'':
+'                    Case Else
+'
+'                End Select
+            Case Else
+        End Select
+    
+    Else
+        Select Case uMsg
+
+            Case WM_MOUSEACTIVATE
+                If GetFocus() <> hWnd Then
+                    acc.accSelect 1&
+                    WndProc = MA_NOACTIVATE
+                    Exit Function
+                End If
+    
+            Case WM_NCDESTROY
+                RemoveSubClass
+                Exit Function
+            Case Else
+
+        End Select
+    End If
+    WndProc = DefSubclassProc(hWnd, uMsg, wParam, lParam)
+    
+End Function
+
+Public Function DoGVNotify(hWnd As LongPtr, lParam As LongPtr) As Long
+    Dim sText As String, sSubText As String
+    Dim tNMH As NMHDR
+    MoveMemory ByVal VarPtr(tNMH), ByVal lParam, Len(tNMH)
+    
+    Dim nlv As NMLISTVIEW
+    Dim nia As NMITEMACTIVATE
+    
+    Select Case tNMH.Code
+
+        Case LVN_ITEMCHANGED
+'            Debug.Print "LVN_ITEMCHANGED"
+            MoveMemory nlv, ByVal lParam, LenB(nlv)
+            RaiseEvent ItemSelected(nlv.iItem, nlv.iSubItem)
+            Exit Function
+    
+        Case NM_CLICK
+'            Debug.Print "NM_CLICK"
+            MoveMemory nia, ByVal lParam, LenB(nia)
+            RaiseEvent ItemClick(nia.iItem, nia.iSubItem)
+            Exit Function
+            
+        Case LVN_GETDISPINFOA
+'            Debug.Print "GetDispInfo"
+            Dim LVDI As NMLVDISPINFOA
+            MoveMemory ByVal VarPtr(LVDI), ByVal lParam, LenB(LVDI)
+            With LVDI.Item
+                
+                If (.mask And LVIF_TEXT) Then
+                    Select Case .iSubItem
+                        Case 0
+'                                sText = ItemTxt(.iItem)
+'                                .cchTextMax = Len(sText)
+                            .pszText = StrPtr(VLItems(.iItem).sText)
+                        Case Else
+                            'sSubText = "Subitem " & .iSubItem
+'                                .cchTextMax = Len(sSubText)
+                            .pszText = StrPtr(VLItems(.iItem).sSubItems(.iSubItem - 1))
+'                                Debug.Print "subitemtext=" & StrPtr(sSubText)
+                    End Select
+                End If
+                
+                If (.mask And LVIF_IMAGE) Then
+                    Select Case .iSubItem
+                        Case 0
+                            .iImage = VLItems(.iItem).iImage
+                    End Select
+                End If
+                MoveMemory ByVal lParam, ByVal VarPtr(LVDI), LenB(LVDI)
+            End With
+        End Select
+    Exit Function
+End Function
+
+Private Function GetPtr(ByVal ptr As LongPtr) As LongPtr
+    GetPtr = ptr
+End Function
+
+Private Sub RemoveSubClass()
+    With TT
+        If .hChild Then
+            RemoveWindowSubclass .hChild, .pfn, .hChild
+            .hChild = 0
+        End If
+
+        If .hParent Then
+            RemoveWindowSubclass .hParent, .pfn, .hParent
+            .hParent = 0
+        End If
+    End With
+End Sub
+
